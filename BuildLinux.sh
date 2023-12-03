@@ -160,19 +160,19 @@ then
     then
         BUILD_ARGS="-DDEP_WX_GTK3=ON"
     fi
-    if [[ -n "$BUILD_DEBUG" ]]
-    then
-        # have to build deps with debug & release or the cmake won't find evrything it needs
-        if [ ! -d "deps/build/release" ]
-        then 
-            mkdir deps/build/release
-        fi
-        pushd deps/build/release
-            cmake ../.. -DDESTDIR="../destdir" $BUILD_ARGS
-            make -j$NCORES
-        popd
-        BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TYPE=Debug"
-    fi
+    # if [[ -n "$BUILD_DEBUG" ]]
+    # then
+    #     # have to build deps with debug & release or the cmake won't find evrything it needs
+    #     if [ ! -d "deps/build/release" ]
+    #     then 
+    #         mkdir deps/build/release
+    #     fi
+    #     pushd deps/build/release
+    #         cmake ../.. -DDESTDIR="../destdir" $BUILD_ARGS
+    #         make -j$NCORES
+    #     popd
+    #     BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TYPE=Debug"
+    # fi
     
     # cmake deps
     pushd deps/build
@@ -220,7 +220,7 @@ then
     fi
     if [[ -n "$BUILD_DEBUG" ]]
     then
-        BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TYPE=Debug -DBBL_INTERNAL_TESTING=1"
+        BUILD_ARGS="${BUILD_ARGS} -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBBL_INTERNAL_TESTING=0"
     else
         BUILD_ARGS="${BUILD_ARGS} -DBBL_RELEASE_TO_PUBLIC=1 -DBBL_INTERNAL_TESTING=0"
     fi

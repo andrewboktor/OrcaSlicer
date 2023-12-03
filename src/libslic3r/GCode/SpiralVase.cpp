@@ -99,7 +99,7 @@ std::string SpiralVase::process_layer(const std::string &gcode)
                         len += dist_XY;
                         line.set(reader, Z, z + len * layer_height_factor);
                         float       factor = len / total_layer_length;
-                        SpiralPoint p(reader.x(), reader.y()); // Get current x/y coordinates
+                        SpiralPoint p(line.x(), line.y()); // Get current x/y coordinates
                         current_layer->push_back(p);           // Store that point for later use on the next layer
                         if (previous_layer != NULL) {
                             long nearest_index = nearest(p, previous_layer); // Find the nearest point on the previous layer
@@ -114,7 +114,7 @@ std::string SpiralVase::process_layer(const std::string &gcode)
                         }
                         if (transition && line.has(E))
                             // Transition layer, modulate the amount of extrusion from zero to the final value.
-                            line.set(reader, E, line.value(E) * factor);
+                            line.set(reader, E, line.value(E) * len / total_layer_length);
                         new_gcode += line.raw() + '\n';
                     }
                     return;
