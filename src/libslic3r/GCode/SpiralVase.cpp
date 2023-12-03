@@ -9,21 +9,20 @@ float distance(SpiralPoint a, SpiralPoint b) {
     return sqrt(pow(a.x-b.x,2)+pow(a.y-b.y, 2));
 }
 
-/** Find nearest point to p from population*/
-struct SpiralPoint nearest(SpiralPoint p, std::vector<SpiralPoint> * population) {
-    float min = distance(p,population->at(0));
-    long min_idx=0;
-    for(long i=0; i<population->size(); i++) {
+/** Find nearest point to p from population, returns the index*/
+long nearest(SpiralPoint p, std::vector<SpiralPoint> *population)
+{
+    float min     = population->size() > 0 ? distance(p, population->at(0)) : 0;
+    long  min_idx = -1;
+    for (unsigned long i = 0; i < population->size(); i++) {
         float dist = distance(population->at(i), p);
-        if(dist < min) {
-            min=dist;
-            min_idx=i;
+        if (dist <= min) {
+            min     = dist;
+            min_idx = i;
         }
     }
-    return population->at(min_idx);
+    return min_idx;
 }
-
-
 
 std::string SpiralVase::process_layer(const std::string &gcode)
 {
@@ -42,7 +41,7 @@ std::string SpiralVase::process_layer(const std::string &gcode)
         return gcode;
     }
 
-    std::vector<SpiralPoint> *current_layer = new std::vector<SpiralPoint>();
+    
     
     // Get total XY length for this layer by summing all extrusion moves.
     float total_layer_length = 0;
@@ -72,6 +71,7 @@ std::string SpiralVase::process_layer(const std::string &gcode)
     // Remove layer height from initial Z.
     z -= layer_height;
 
+    std::vector<SpiralPoint>* current_layer = new std::vector<SpiralPoint>();
     std::vector<SpiralPoint>* previous_layer = m_previous_layer;
     
     std::string new_gcode;
@@ -98,15 +98,18 @@ std::string SpiralVase::process_layer(const std::string &gcode)
                     if (line.extruding(reader)) {
                         len += dist_XY;
                         line.set(reader, Z, z + len * layer_height_factor);
-                        float factor = len/total_layer_length;
-                        SpiralPoint * pp = new SpiralPoint(reader.x(), reader.y()); // Get current x/y coordinates
-                        SpiralPoint p = *pp; // Make a point :D
-                        current_layer->emplace_back(p); // Store that point for later use on the next layer
-                        if(previous_layer) {
-                            SpiralPoint nearestp = nearest(p, previous_layer); // Find the nearest point on the previous layer
-                            if(distance(p, nearestp) < 2) {// Made up threshold to prevent craziness, Cura uses 4*linewidth*linewidth
-                                line.set(reader, X, factor*nearestp.x+(1-factor)*p.x); // Interpolate between the point on this layer and the point on the previous layer
-                                line.set(reader, Y, factor*nearestp.y+(1-factor)*p.y); 
+                        float       factor = len / total_layer_length;
+                        SpiralPoint p(reader.x(), reader.y()); // Get current x/y coordinates
+                        current_layer->push_back(p);           // Store that point for later use on the next layer
+                        if (previous_layer != NULL) {
+                            long nearest_index = nearest(p, previous_layer); // Find the nearest point on the previous layer
+                            if (nearest_index >= 0) {
+                                SpiralPoint nearestp = previous_layer->at(nearest_index);
+                                if (distance(p, nearestp) < 2) { // Made up threshold to prevent craziness, Cura uses 4*linewidth*linewidth
+                                    // Interpolate between the point on this layer and the point on the previous layer
+                                    line.set(reader, X, factor * p.x + (1 - factor) * nearestp.x);
+                                    line.set(reader, Y, factor * p.y + (1 - factor) * nearestp.y);
+                                }
                             }
                         }
                         if (transition && line.has(E))
@@ -126,7 +129,7 @@ std::string SpiralVase::process_layer(const std::string &gcode)
         }
         new_gcode += line.raw() + '\n';
     });
-
+    delete m_previous_layer;
     m_previous_layer = current_layer;
     
     return new_gcode;

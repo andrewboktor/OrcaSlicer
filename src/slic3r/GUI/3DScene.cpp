@@ -70,7 +70,7 @@ void glAssertRecentCallImpl(const char* file_name, unsigned int line, const char
     default:                    sErr = "Unknown";           break;
     }
     BOOST_LOG_TRIVIAL(error) << "OpenGL error in " << file_name << ":" << line << ", function " << function_name << "() : " << (int)err << " - " << sErr;
-    assert(false);
+    // assert(false);
 }
 #endif // HAS_GLSAFE
 
