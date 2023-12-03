@@ -2,7 +2,7 @@
 set -e # exit on first error
 
 export ROOT=`pwd`
-export NCORES=`nproc --all`
+export NCORES=`nproc --ignore 2`
 export CMAKE_BUILD_PARALLEL_LEVEL=${NCORES}
 FOUND_GTK2=$(dpkg -l libgtk* | grep gtk2)
 FOUND_GTK3=$(dpkg -l libgtk* | grep gtk-3)
@@ -163,7 +163,10 @@ then
     if [[ -n "$BUILD_DEBUG" ]]
     then
         # have to build deps with debug & release or the cmake won't find evrything it needs
-        mkdir deps/build/release
+        if [ ! -d "deps/build/release" ]
+        then 
+            mkdir deps/build/release
+        fi
         pushd deps/build/release
             cmake ../.. -DDESTDIR="../destdir" $BUILD_ARGS
             make -j$NCORES

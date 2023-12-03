@@ -1,8 +1,29 @@
 #include "SpiralVase.hpp"
 #include "GCode.hpp"
 #include <sstream>
+#include <cmath>
 
 namespace Slic3r {
+
+float distance(SpiralPoint a, SpiralPoint b) {
+    return sqrt(pow(a.x-b.x,2)+pow(a.y-b.y, 2));
+}
+
+/** Find nearest point to p from population*/
+struct SpiralPoint nearest(SpiralPoint p, std::vector<SpiralPoint> * population) {
+    float min = distance(p,population->at(0));
+    long min_idx=0;
+    for(long i=0; i<population->size(); i++) {
+        float dist = distance(population->at(i), p);
+        if(dist < min) {
+            min=dist;
+            min_idx=i;
+        }
+    }
+    return population->at(min_idx);
+}
+
+
 
 std::string SpiralVase::process_layer(const std::string &gcode)
 {
@@ -20,6 +41,8 @@ std::string SpiralVase::process_layer(const std::string &gcode)
         m_reader.parse_buffer(gcode);
         return gcode;
     }
+
+    std::vector<SpiralPoint> *current_layer = new std::vector<SpiralPoint>();
     
     // Get total XY length for this layer by summing all extrusion moves.
     float total_layer_length = 0;
@@ -48,6 +71,8 @@ std::string SpiralVase::process_layer(const std::string &gcode)
     
     // Remove layer height from initial Z.
     z -= layer_height;
+
+    std::vector<SpiralPoint>* previous_layer = m_previous_layer;
     
     std::string new_gcode;
     //FIXME Tapering of the transition layer only works reliably with relative extruder distances.
@@ -57,7 +82,7 @@ std::string SpiralVase::process_layer(const std::string &gcode)
     bool  transition = m_transition_layer && m_config.use_relative_e_distances.value;
     float layer_height_factor = layer_height / total_layer_length;
     float len = 0.f;
-    m_reader.parse_buffer(gcode, [&new_gcode, &z, total_layer_length, layer_height_factor, transition, &len]
+    m_reader.parse_buffer(gcode, [&new_gcode, &z, total_layer_length, layer_height_factor, transition, &len, &current_layer, &previous_layer]
         (GCodeReader &reader, GCodeReader::GCodeLine line) {
         if (line.cmd_is("G1")) {
             if (line.has_z()) {
@@ -73,9 +98,20 @@ std::string SpiralVase::process_layer(const std::string &gcode)
                     if (line.extruding(reader)) {
                         len += dist_XY;
                         line.set(reader, Z, z + len * layer_height_factor);
+                        float factor = len/total_layer_length;
+                        SpiralPoint * pp = new SpiralPoint(reader.x(), reader.y()); // Get current x/y coordinates
+                        SpiralPoint p = *pp; // Make a point :D
+                        current_layer->emplace_back(p); // Store that point for later use on the next layer
+                        if(previous_layer) {
+                            SpiralPoint nearestp = nearest(p, previous_layer); // Find the nearest point on the previous layer
+                            if(distance(p, nearestp) < 2) {// Made up threshold to prevent craziness, Cura uses 4*linewidth*linewidth
+                                line.set(reader, X, factor*nearestp.x+(1-factor)*p.x); // Interpolate between the point on this layer and the point on the previous layer
+                                line.set(reader, Y, factor*nearestp.y+(1-factor)*p.y); 
+                            }
+                        }
                         if (transition && line.has(E))
                             // Transition layer, modulate the amount of extrusion from zero to the final value.
-                            line.set(reader, E, line.value(E) * len / total_layer_length);
+                            line.set(reader, E, line.value(E) * factor);
                         new_gcode += line.raw() + '\n';
                     }
                     return;
@@ -90,6 +126,8 @@ std::string SpiralVase::process_layer(const std::string &gcode)
         }
         new_gcode += line.raw() + '\n';
     });
+
+    m_previous_layer = current_layer;
     
     return new_gcode;
 }

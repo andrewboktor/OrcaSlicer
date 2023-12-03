@@ -6,7 +6,17 @@
 
 namespace Slic3r {
 
+class SpiralPoint
+{
+    public:
+        SpiralPoint(float paramx, float paramy) : x(paramx), y(paramy) {}
+    public:
+        float x, y;
+    
+};
+
 class SpiralVase {
+    
 public:
     SpiralVase(const PrintConfig &config) : m_config(config)
     {
@@ -28,7 +38,10 @@ private:
     bool 				m_enabled = false;
     // First spiral vase layer. Layer height has to be ramped up from zero to the target layer height.
     bool 				m_transition_layer = false;
+    std::vector<SpiralPoint> * m_previous_layer;
 };
+
+
 
 }
 
