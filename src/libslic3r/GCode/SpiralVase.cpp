@@ -124,15 +124,16 @@ std::string SpiralVase::process_layer(const std::string &gcode, bool last_layer)
     bool smooth_spiral = m_smooth_spiral;
     std::string new_gcode;
     std::string transition_gcode;
-    float max_xy_smoothing = 1; // Made up threshold to prevent snapping to points too far away, Cura uses (2*line_width)^2 but I can't figure out how to get that config for this layer
+    float max_xy_smoothing = 0.8; // Made up threshold to prevent snapping to points too far away, Cura uses (2*line_width)^2 but I can't figure out how to get line_width here
     //FIXME Tapering of the transition layer only works reliably with relative extruder distances.
     // For absolute extruder distances it will be switched off.
     // Tapering the absolute extruder distances requires to process every extrusion value after the first transition
     // layer.
-    bool  transition = m_transition_layer && m_config.use_relative_e_distances.value;
+    bool  transition_in = m_transition_layer && m_config.use_relative_e_distances.value;
+    bool  transition_out = last_layer && m_config.use_relative_e_distances.value;
     float len = 0.f;
     SpiralPoint last_point = previous_layer != NULL && previous_layer->size() >0? previous_layer->at(previous_layer->size()-1): SpiralPoint(0,0);
-    m_reader.parse_buffer(gcode, [&new_gcode, &z, total_layer_length, layer_height, transition, &len, &current_layer, &previous_layer, &transition_gcode, &last_layer, &smooth_spiral, &max_xy_smoothing, &last_point]
+    m_reader.parse_buffer(gcode, [&new_gcode, &z, total_layer_length, layer_height, transition_in, &len, &current_layer, &previous_layer, &transition_gcode, transition_out, &smooth_spiral, &max_xy_smoothing, &last_point]
         (GCodeReader &reader, GCodeReader::GCodeLine line) {
         if (line.cmd_is("G1")) {
             if (line.has_z()) {
@@ -145,18 +146,18 @@ std::string SpiralVase::process_layer(const std::string &gcode, bool last_layer)
                 float dist_XY = line.dist_XY(reader);
                 if (dist_XY > 0) {
                     // horizontal move
-                    if (line.has_e()) {
+                    if (line.extruding(reader)) { // We need this to exclude retract and wipe moves!
                         len += dist_XY;
                         float factor = len / total_layer_length;
-                        if (transition)
+                        if (transition_in)
                             // Transition layer, interpolate the amount of extrusion from zero to the final value.
                             line.set(reader, E, line.e() * factor);
-                        else if (last_layer) {
+                        else if (transition_out) {
                             // We want the last layer to ramp down extrusion, but without changing z height!
                             // So clone the line before we mess with its Z and duplicate it into a new layer that ramps down E
                             // We add this new layer at the very end
                             GCodeReader::GCodeLine transitionLine(line);
-                            transitionLine.set(reader, E, line.value(E) * (1 - factor));
+                            transitionLine.set(reader, E, line.e() * (1 - factor));
                             transition_gcode += transitionLine.raw() + '\n';
                         }
                         // This line is the core of Spiral Vase mode, ramp up the Z smoothly
@@ -192,12 +193,14 @@ std::string SpiralVase::process_layer(const std::string &gcode, bool last_layer)
                         cause a visible seam when loops are not aligned in XY; by skipping
                         it we blend the first loop move in the XY plane (although the smoothness
                         of such blend depend on how long the first segment is; maybe we should
-                        enforce some minimum length?).  */
+                        enforce some minimum length?).
+                        When smooth_spiral is enabled, we're gonna end up exactly where the next layer should 
+                        start anyway, so we don't need the travel move */
                 }
             }
         }
         new_gcode += line.raw() + '\n';
-        if(last_layer) {
+        if(transition_out) {
             transition_gcode += line.raw() + '\n';
         }
     });
