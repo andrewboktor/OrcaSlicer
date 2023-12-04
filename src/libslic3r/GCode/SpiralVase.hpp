@@ -23,6 +23,7 @@ public:
         m_reader.z() = (float)m_config.z_offset;
         m_reader.apply_config(m_config);
         m_previous_layer = NULL;
+        m_smooth_spiral = config.spiral_mode_smooth;
     };
 
     void 		enable(bool en) {
@@ -30,7 +31,7 @@ public:
     	m_enabled 		   = en;
     }
 
-    std::string process_layer(const std::string &gcode);
+    std::string process_layer(const std::string &gcode, bool last_layer);
     
 private:
     const PrintConfig  &m_config;
@@ -39,6 +40,8 @@ private:
     bool 				m_enabled = false;
     // First spiral vase layer. Layer height has to be ramped up from zero to the target layer height.
     bool 				m_transition_layer = false;
+    // Whether to interpolate XY coordinates with the previous layer. Results in no seam at layer changes
+    bool                m_smooth_spiral = false;
     std::vector<SpiralPoint> * m_previous_layer;
 };
 
