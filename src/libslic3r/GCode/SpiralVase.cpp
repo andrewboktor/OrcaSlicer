@@ -171,8 +171,8 @@ std::string SpiralVase::process_layer(const std::string &gcode, bool last_layer)
                                 float       dist     = 0;
                                 SpiralPoint nearestp = nearest_point_on_polygon(p, previous_layer, found, dist);
                                 if (found && dist < max_xy_smoothing) {
-                                    SpiralPoint target = add(scale(nearestp, 1 - factor), scale(p, factor));
                                     // Interpolate between the point on this layer and the point on the previous layer
+                                    SpiralPoint target = add(scale(nearestp, 1 - factor), scale(p, factor));
                                     line.set(reader, X, target.x);
                                     line.set(reader, Y, target.y);
                                     // We need to figure out the distance of this new line!
